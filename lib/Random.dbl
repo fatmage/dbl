@@ -34,6 +34,8 @@ handle {effect=Rand} (`st : State Rand (Pair Int Int)) =
   return  x => fn _ => x
   finally c => c (0, 0)
 
+
+
 pub let self_init () = put (21, 37)
 
 pub let init (s0 : Int) (s1 : Int) = put (s0, s1)
@@ -51,6 +53,8 @@ implicit `re
 let `re = effect x / _ => fn x => ()
 
 pub let rand_int n = (next ()).mod n
+
+pub let rand_bool () = (next () < 0)
 
 
 
