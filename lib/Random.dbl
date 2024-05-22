@@ -36,25 +36,42 @@ handle {effect=Rand} (`st : State Rand (Pair Int Int)) =
 
 
 
-pub let self_init () = put (21, 37)
+let get_seed = extern dbl_getSeed : Unit -> Int
+
+pub let self_init () = put (get_seed (), get_seed ()) 
 
 pub let init (s0 : Int) (s1 : Int) = put (s0, s1)
 
-let rotl (x : Int) (k : Int) = (x.shiftl k).lxor (x.shiftr (64 - k))
+let rotl (x : Int) (k : Int) = (x << k) ^^^ (x >> (64 - k))
 
 let next () = 
   let (s0, s1) = get () in 
-  let s1' = s1.lxor s0 in 
-  let _ = put (((rotl s0 24).lxor s1').lxor (s1'.shiftl 16), 
+  let s1' = s1 ^^^ s0 in 
+  let _ = put (((rotl s0 24) ^^^ s1') ^^^ (s1' << 16), 
                rotl s1' 37) 
   in s0 + s1
 
 implicit `re
 let `re = effect x / _ => fn x => ()
 
-pub let rand_int n = (next ()).mod n
+pub let rand_int n = (next ()) % n
 
-pub let rand_bool () = (next () < 0)
+pub let rand_bool () = (next ()) < 0
+
+
+(* helper functions for debugging purposes, to be removed *)
+
+pub let expose_state () =
+  let (s0, s1) = get () in 
+  let _ = printInt s0 in 
+  let _ = printStr " " in 
+  let _ = printInt s1 in 
+  let _ = printStrLn "" in ()
+
+pub let rec count (t : Int) (f : Int) (i : Int) (n : Int) =
+  if i == n then t, f 
+  else if rand_bool () then count (t + 1) f (i + 1) n 
+  else count t (f + 1) (i + 1) n 
 
 
 

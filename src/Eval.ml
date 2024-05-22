@@ -61,6 +61,14 @@ let int_cmpop op = int2_fun (fun x y -> of_bool (op x y))
 
 let str_cmpop op = str_fun (fun s1 -> str_fun (fun s2 -> of_bool (op s1 s2)))
 
+let get_seed () = try 
+                    let buf = Bytes.create 8 in 
+                    let readn = input (open_in_bin "/dev/urandom") buf 0 8 in 
+                    if readn != 8 then raise (Sys_error "read error")
+                    else Bytes.fold_left (fun acc ch -> (Int.shift_left acc 8) lor (int_of_char ch)) 0 buf  
+                  with Sys_error e -> () |> Unix.time |> int_of_float 
+
+
 let extern_map =
   [ "dbl_addInt",      int_binop ( + );
     "dbl_subInt",      int_binop ( - );
@@ -94,6 +102,7 @@ let extern_map =
     "dbl_printStr",   str_fun (fun s -> print_string s; v_unit);
     "dbl_printInt",   int_fun (fun n -> print_int n; v_unit);
     "dbl_readLine",   unit_fun (fun () -> VStr (read_line ()));
+    "dbl_getSeed", unit_fun (fun () -> VNum (get_seed ()));
     "dbl_exit",       int_fun exit;
   ] |> List.to_seq |> Hashtbl.of_seq
 
