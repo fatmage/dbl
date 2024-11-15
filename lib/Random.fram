@@ -1,5 +1,5 @@
 (*
-  xoroshiro128+ PRNG
+  xoroshiro128++ PRNG
   https://prng.di.unimi.it/
  *)
 
@@ -25,47 +25,58 @@ let update f =
   update f
 
 (* Standard state handler *)
-handle {effect=Rand} (~st : State Rand (Pair Int Int)) =
+handle {effect=Rand} (~st : State Rand (Pair Int64 Int64)) =
   let get = effect x / r => fn s => r s  s
   let put = effect s / r => fn _ => r () s
   let update f = put (f (get ())) in
     State { get, put, update }
   return  x => fn _ => x
-  finally c => c (0, 0)
+  finally c => c (0L, 0L)
 
-let get_seed = extern dbl_getSeed : Unit -> Int
+let get_seed = extern dbl_getSeed : Unit -> Int64
 
-pub let self_init () = put (get_seed (), get_seed ())
+let splitmix64 (seed : Int64) =
+  let z0 = seed + 0x9e3779b97f4a7c15L in
+  let z1 = (z0 ^^^ (z0 >> 30L)) * 0xbf58476d1ce4e5b9L in
+  let z2 = (z1 ^^^ (z1 >> 27L)) * 0x94d049bb133111ebL in
+  z0, z2 ^^^ (z2 >> 31L)
 
-pub let init (s0 : Int) (s1 : Int) = put (s0, s1)
+pub let self_init () =
+  let (next_seed, s0) = splitmix64 (get_seed ()) in
+  put (s0, snd (splitmix64 next_seed))
 
-let rotl (x : Int) (k : Int) = (x << k) ^^^ (x >> (64 - k))
+pub let init (s0 : Int64) (s1 : Int64) = put (s0, s1)
+
+let rotl (x : Int64) (k : Int64) = (x << k) ||| (x >> (64L - k))
 
 let next () =
   let (s0, s1) = get () in
   let s1' = s1 ^^^ s0 in
-  let _ = put (((rotl s0 24) ^^^ s1') ^^^ (s1' << 16),
-               rotl s1' 37)
-  in s0 + s1
+  let _ = put (((rotl s0 49L) ^^^ s1') ^^^ (s1' << 21L),
+               rotl s1' 28L)
+  in (rotl (s0 + s1) 17L) + s0
 
 implicit ~re
-let ~re = effect x / _ => fn x => ()
+let ~re = fn () => exit 0
 
-pub let rand_int n = (next ()) % n
+pub let rand_int n = (next ()).toInt % n
 
-pub let rand_bool () = (next ()) < 0
+pub let rand_int64 n = (next ()) % n
 
+pub let rand_bool () = ((next ()) &&& 1L) == 1L
 
 (* helper functions for debugging purposes, to be removed *)
 
+let printInt64 (i : Int64) = printInt i.toInt
+
 pub let expose_state () =
   let (s0, s1) = get () in
-  let _ = printInt s0 in
+  let _ = printInt64 s0 in
   let _ = printStr " " in
-  let _ = printInt s1 in
+  let _ = printInt64 s1 in
   let _ = printStrLn "" in ()
 
 pub let rec count (t : Int) (f : Int) (i : Int) (n : Int) =
-  if i == n then t, f
+  if i == n then (let _ = printInt t in let _ = printStr " " in let _ = printInt f in t, f)
   else if rand_bool () then count (t + 1) f (i + 1) n
   else count t (f + 1) (i + 1) n

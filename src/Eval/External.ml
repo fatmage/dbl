@@ -22,7 +22,7 @@ let str_fun f = VFn (fun v cont ->
 let list_chr_fun f = VFn (fun v cont ->
   let rec parse_list = function
   | VCtor(0, []) -> []
-  | VCtor(1, [VNum x; xs]) -> Char.chr x :: parse_list xs 
+  | VCtor(1, [VNum x; xs]) -> Char.chr x :: parse_list xs
   | _ -> failwith "Runtime error!" in
   cont (f @@ parse_list v))
 
@@ -33,7 +33,7 @@ let of_bool b =
 
 let rec of_list = function
   | [] -> VCtor(0, [])
-  | x :: xs -> VCtor(1, [x; of_list xs]) 
+  | x :: xs -> VCtor(1, [x; of_list xs])
 
 let int_fun2 f = int_fun (fun x -> int_fun (f x))
 
@@ -54,6 +54,8 @@ let int64_int_op op = int64_fun2 (fun x y -> VNum64 (op x (Int64.to_int y)))
 let int64_cmpop op = int64_fun2 (fun x y -> of_bool (op x y))
 
 let str_cmpop op = str_fun (fun s1 -> str_fun (fun s2 -> of_bool (op s1 s2)))
+
+let get_seed () = let _ = Random.self_init () in Random.int64 Int64.max_int
 
 let extern_map =
   [ "dbl_negInt",      int_unop ( ~- );
@@ -114,6 +116,5 @@ let extern_map =
     "dbl_intToInt64",    int_fun (fun n -> VNum64 (Int64.of_int n));
     "dbl_int64ToInt",    int64_fun (fun n -> VNum (Int64.to_int n));
     "dbl_int64ToString", int64_fun (fun n -> VStr (Int64.to_string n));
+    "dbl_getSeed", unit_fun (fun () -> VNum64 (get_seed ()))
   ] |> List.to_seq |> Hashtbl.of_seq
-
-
