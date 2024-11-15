@@ -1,0 +1,71 @@
+(*
+  xoroshiro128+ PRNG
+  https://prng.di.unimi.it/
+ *)
+
+(* Standard state effect with its accompanying methods *)
+data State (effect E) X = State of
+  { get    : Unit ->[E] X
+  , put    : X ->[E] Unit
+  , update : {Row} -> (X ->[E|Row] X) ->[E|Row] Unit
+  }
+
+implicit ~st {E_st} : State E_st _
+
+let get x =
+  let (State { get }) = ~st in
+  get x
+
+let put x =
+  let (State { put }) = ~st in
+  put x
+
+let update f =
+  let (State { update }) = ~st in
+  update f
+
+(* Standard state handler *)
+handle {effect=Rand} (~st : State Rand (Pair Int Int)) =
+  let get = effect x / r => fn s => r s  s
+  let put = effect s / r => fn _ => r () s
+  let update f = put (f (get ())) in
+    State { get, put, update }
+  return  x => fn _ => x
+  finally c => c (0, 0)
+
+let get_seed = extern dbl_getSeed : Unit -> Int
+
+pub let self_init () = put (get_seed (), get_seed ())
+
+pub let init (s0 : Int) (s1 : Int) = put (s0, s1)
+
+let rotl (x : Int) (k : Int) = (x << k) ^^^ (x >> (64 - k))
+
+let next () =
+  let (s0, s1) = get () in
+  let s1' = s1 ^^^ s0 in
+  let _ = put (((rotl s0 24) ^^^ s1') ^^^ (s1' << 16),
+               rotl s1' 37)
+  in s0 + s1
+
+implicit ~re
+let ~re = effect x / _ => fn x => ()
+
+pub let rand_int n = (next ()) % n
+
+pub let rand_bool () = (next ()) < 0
+
+
+(* helper functions for debugging purposes, to be removed *)
+
+pub let expose_state () =
+  let (s0, s1) = get () in
+  let _ = printInt s0 in
+  let _ = printStr " " in
+  let _ = printInt s1 in
+  let _ = printStrLn "" in ()
+
+pub let rec count (t : Int) (f : Int) (i : Int) (n : Int) =
+  if i == n then t, f
+  else if rand_bool () then count (t + 1) f (i + 1) n
+  else count t (f + 1) (i + 1) n
