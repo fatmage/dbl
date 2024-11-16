@@ -10,22 +10,14 @@ data State (effect E) X = State of
   , update : {Row} -> (X ->[E|Row] X) ->[E|Row] Unit
   }
 
-implicit ~st {E_st} : State E_st _
+implicit ~randSt {E_st} : State E_st _
 
-let get x =
-  let (State { get }) = ~st in
-  get x
-
-let put x =
-  let (State { put }) = ~st in
-  put x
-
-let update f =
-  let (State { update }) = ~st in
-  update f
+let get x = let (State { get }) = ~randSt in get x
+let put x = let (State { put }) = ~randSt in put x
+let update f = let (State { update }) = ~randSt in update f
 
 (* Standard state handler *)
-handle {effect=Rand} (~st : State Rand (Pair Int64 Int64)) =
+handle {effect=Rand} (~randSt : State Rand (Pair Int64 Int64)) =
   let get = effect x / r => fn s => r s  s
   let put = effect s / r => fn _ => r () s
   let update f = put (f (get ())) in
@@ -33,50 +25,32 @@ handle {effect=Rand} (~st : State Rand (Pair Int64 Int64)) =
   return  x => fn _ => x
   finally c => c (0L, 0L)
 
-let get_seed = extern dbl_getSeed : Unit -> Int64
+let getSeed = extern dbl_getSeed : Unit -> Int64
 
+(* splitmix64 algorithm for generating seeds for the proper PRNG *)
 let splitmix64 (seed : Int64) =
   let z0 = seed + 0x9e3779b97f4a7c15L in
   let z1 = (z0 ^^^ (z0 >> 30L)) * 0xbf58476d1ce4e5b9L in
   let z2 = (z1 ^^^ (z1 >> 27L)) * 0x94d049bb133111ebL in
   z0, z2 ^^^ (z2 >> 31L)
 
-pub let self_init () =
-  let (next_seed, s0) = splitmix64 (get_seed ()) in
-  put (s0, snd (splitmix64 next_seed))
-
-pub let init (s0 : Int64) (s1 : Int64) = put (s0, s1)
-
 let rotl (x : Int64) (k : Int64) = (x << k) ||| (x >> (64L - k))
 
 let next () =
   let (s0, s1) = get () in
   let s1' = s1 ^^^ s0 in
-  let _ = put (((rotl s0 49L) ^^^ s1') ^^^ (s1' << 21L),
-               rotl s1' 28L)
-  in (rotl (s0 + s1) 17L) + s0
+  let _ = put (((rotl s0 49L) ^^^ s1') ^^^ (s1' << 21L), rotl s1' 28L) in
+  (rotl (s0 + s1) 17L) + s0
+
+pub let init (seed : Int64) =
+  let (nextSeed, s0) = splitmix64 seed in
+  put (s0, snd (splitmix64 nextSeed))
+
+pub let selfInit () = init (getSeed ())
 
 implicit ~re
-let ~re = fn () => exit 0
+let ~re = fn () => exit 1
 
-pub let rand_int n = (next ()).toInt % n
-
-pub let rand_int64 n = (next ()) % n
-
-pub let rand_bool () = ((next ()) &&& 1L) == 1L
-
-(* helper functions for debugging purposes, to be removed *)
-
-let printInt64 (i : Int64) = printInt i.toInt
-
-pub let expose_state () =
-  let (s0, s1) = get () in
-  let _ = printInt64 s0 in
-  let _ = printStr " " in
-  let _ = printInt64 s1 in
-  let _ = printStrLn "" in ()
-
-pub let rec count (t : Int) (f : Int) (i : Int) (n : Int) =
-  if i == n then (let _ = printInt t in let _ = printStr " " in let _ = printInt f in t, f)
-  else if rand_bool () then count (t + 1) f (i + 1) n
-  else count t (f + 1) (i + 1) n
+pub let int n = (next ()).toInt % n
+pub let int64 n = (next ()) % n
+pub let bool () = next () < 0L
