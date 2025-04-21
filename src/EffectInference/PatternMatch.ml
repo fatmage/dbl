@@ -181,8 +181,9 @@ module Make(Ctx : MatchContext) = struct
     clauses have list of patterns. *)
   let rec tr_match ctx xs cls =
     match xs, cls with
-    | [], [] -> 
+    | [], [] ->
       (* TODO: non-exhaustive pattern-match doesn't have to be fatal *)
+      print_endline @@ "CONTEXT: " ^ PatternContext.print_ctx ctx;
       Error.fatal (Error.non_exhaustive_match ~pos:Ctx.pos ctx)
 
     | [], cl :: _ ->

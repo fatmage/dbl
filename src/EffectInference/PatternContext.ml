@@ -16,6 +16,12 @@ type ex_pattern =
   | ExCtor of string * (T.name * ex_pattern) list * ex_pattern list
     (** Constructor pattern, with implicit parameters *)
 
+let print_exp exp =
+  match exp with
+  | ExHole -> "~Hole"
+  | ExWildcard -> "~Wildcard"
+  | ExCtor (str, xs, ys) -> "~" ^ str
+
 (** Zipper context of a not-matched counterexample *)
 type ctx =
   | CtxRoot
@@ -36,6 +42,13 @@ type ctx =
     (** ADT constructor contexts, focussed in regular parameters.
       The left list of example patterns is
       in reversed order *)
+
+let rec print_ctx ctx =
+  match ctx with
+  | CtxRoot -> "CtxRoot"
+  | CtxDone exp -> "CtxDone " ^ print_exp exp
+  | CtxCtorI (str, _, _, _, _, _) -> "CtxCtorI " ^ str
+  | CtxCtorP (str, _, _, _, _) -> "CtxCtorP " ^ str
 
 (** Plug given example pattern into the context, and focus on the next hole *)
 let rec refocus_with ctx ex =
@@ -68,7 +81,7 @@ and try_focus_ctor_i ctx name left right exs =
   match right with
   | [] -> try_focus_ctor_p ctx name (List.rev left) [] exs
   | (iname, ex) :: right ->
-    begin match 
+    begin match
       try_focus (CtxCtorI(name, left, iname, ctx, right, exs)) ex
     with
     | Some ctx -> Some ctx

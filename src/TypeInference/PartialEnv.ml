@@ -14,7 +14,7 @@ type tvar_info = {
 
   ti_pos    : Position.t;
     (** The position where the type variable is bound. *)
-    
+
   ti_tvar   : T.tvar;
     (** The Unif representation of this type variable. *)
 }
@@ -42,7 +42,7 @@ type module_info = {
 
   mi_types     : (S.tvar * T.tvar) list;
     (** The public type variables of the module. *)
-  
+
   mi_vals      : (Name.t * T.var * T.scheme) list;
     (** The public values of the module. *)
 }
